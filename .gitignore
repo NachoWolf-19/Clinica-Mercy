@@ -12,6 +12,7 @@
 
 # Package Files #
 *.jar
+!MercyMed_Desk/lib/*.jar
 *.war
 *.nar
 *.ear
