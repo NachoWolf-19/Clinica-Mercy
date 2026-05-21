@@ -31,18 +31,18 @@ CREATE TABLE especialidad(
 	CONSTRAINT ch_especialidadNombre 	CHECK (especialidadNombre REGEXP '^[a-zA-ZáéíóúÁÉÍÓÚñÑ ]+$' AND LENGTH(TRIM(especialidadNombre)) > 0)
 );
 
--- =================================== Tabla Doctor
+-- =================================== Tabla Medico
 CREATE TABLE medico(
 	medicoID 		INT AUTO_INCREMENT,
-	medicoNombres 	VARCHAR(50) NULL,
-	medicoApellidos VARCHAR(50) NULL,
-	especialidadID 	INT NULL,
+	medicoNombres 	VARCHAR(50) NOT NULL,
+	medicoApellidos VARCHAR(50) NOT NULL,
+	especialidadID 	INT NOT NULL,
 	medicoEstado 	VARCHAR(10) NOT NULL DEFAULT 'Activo',
     CONSTRAINT pk_medico				PRIMARY KEY (medicoID),
 	CONSTRAINT fk_medico_especialidad 	FOREIGN KEY (especialidadID) REFERENCES especialidad(especialidadID),
 	CONSTRAINT ch_medicoNombres 		CHECK (medicoNombres REGEXP '^[a-zA-ZáéíóúÁÉÍÓÚñÑ ]+$' AND LENGTH(TRIM(medicoNombres)) > 0),
 	CONSTRAINT ch_medicoApellidos 		CHECK (medicoApellidos REGEXP '^[a-zA-ZáéíóúÁÉÍÓÚñÑ ]+$' AND LENGTH(TRIM(medicoApellidos)) > 0),
-    CONSTRAINT ch_medicoEstado 			CHECK (medicoEstado IN ('Activo', 'Borrado'))
+    CONSTRAINT ch_medicoEstado 			CHECK (medicoEstado IN ('Activo', 'Vacaciones' 'Retirado'))
 );
 
 -- =================================== Tabla Consultorio
@@ -107,3 +107,109 @@ CREATE TABLE usuario(
 -- ============================================================================================================================
 -- ======================================================Procesos==============================================================
 -- ============================================================================================================================
+-- =================================== Paciente
+-- Create
+DELIMITER //
+CREATE PROCEDURE usp_RegistrarPaciente(
+	IN dni CHAR(8),
+	IN nombres VARCHAR(50),
+    IN apellidos VARCHAR(50),
+    IN numero VARCHAR(10),
+    IN email VARCHAR(150)
+)
+BEGIN
+	IF numero = '' THEN
+		SET numero = 'Sin numero';
+	END IF;
+    
+	IF email = '' THEN
+		SET email = 'Sin email';
+	END IF;
+    
+    INSERT INTO paciente(pacienteDNI, pacienteNombres, pacienteApellidos, pacienteNumero, pacienteEmail)
+    VALUES
+    (dni, nombres, apellidos, numero, email);
+END //
+DELIMITER ;
+
+-- Read
+CREATE VIEW vw_ListaPacientes AS
+SELECT
+	pacienteID as id,
+    pacienteDNI as dni,
+    CONCAT(pacienteNombres, ' ', pacienteApellidos) AS nombre_completo,
+    pacienteNumero as telefono,
+    pacienteEmail as email
+FROM paciente
+WHERE pacienteEstado = 'Activo';
+
+-- Update
+DELIMITER //
+CREATE PROCEDURE usp_ActualizarPaciente(
+	IN id INT,
+	IN dni CHAR(8),
+	IN nombres VARCHAR(50),
+    IN apellidos VARCHAR(50),
+    IN numero VARCHAR(10),
+    IN email VARCHAR(150)
+)
+BEGIN
+	IF numero = '' THEN
+		SET numero = 'Sin numero';
+	END IF;
+    
+	IF email = '' THEN
+		SET email = 'Sin email';
+	END IF;
+    
+    UPDATE paciente
+    SET
+		pacienteDNI = dni,
+        pacienteNombres = nombres,
+        pacienteApellidos = apellidos,
+        pacienteNumero = numero,
+        pacienteEmail = email
+	WHERE pacienteID = id;
+END //
+DELIMITER ;
+
+-- Delete
+DELIMITER //
+CREATE PROCEDURE usp_EliminarPaciente(
+	IN id INT
+)
+BEGIN
+	DECLARE citas_activas INT DEFAULT 0;
+
+	SELECT COUNT(*) INTO citas_activas
+	FROM citas c
+	INNER JOIN horario h ON c.horarioID = h.horarioID
+	WHERE c.pacienteID = id
+		AND h.horarioEstado = 'Reservado'
+		AND TIMESTAMP(h.horarioFecha, h.horarioInicio) > NOW();
+
+	IF citas_activas > 0 THEN
+		SIGNAL SQLSTATE '45000' 
+		SET MESSAGE_TEXT = 'No se puede eliminar: El paciente tiene citas reservadas pendientes.';
+	ELSE
+		UPDATE paciente
+		SET
+			pacienteDNI = NULL,
+			pacienteNombres = NULL,
+			pacienteApellidos = NULL,
+			pacienteNumero = NULL,
+			pacienteEmail = NULL,
+			pacienteEstado = 'Borrado'
+		WHERE pacienteID = id;
+	END IF;
+END //
+DELIMITER ;
+
+-- =================================== Especialidad
+
+-- =================================== Medico
+-- =================================== Consultorio
+-- =================================== Horario
+-- =================================== Citas
+-- =================================== Roll
+-- =================================== Usuario
