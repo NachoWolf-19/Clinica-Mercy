@@ -27,30 +27,36 @@ CREATE TABLE paciente(
 CREATE TABLE especialidad(
 	especialidadID 		INT AUTO_INCREMENT,
 	especialidadNombre 	VARCHAR(50) NOT NULL,
+    especialidadEstado	VARCHAR(10) NOT NULL DEFAULT 'Activo',
     CONSTRAINT pk_especialidad			PRIMARY KEY (especialidadID),
-	CONSTRAINT ch_especialidadNombre 	CHECK (especialidadNombre REGEXP '^[a-zA-ZáéíóúÁÉÍÓÚñÑ ]+$' AND LENGTH(TRIM(especialidadNombre)) > 0)
+	CONSTRAINT ch_especialidadNombre 	CHECK (especialidadNombre REGEXP '^[a-zA-ZáéíóúÁÉÍÓÚñÑ ]+$' AND LENGTH(TRIM(especialidadNombre)) > 0),
+    CONSTRAINT ch_especialidadEstado	CHECK (especialidadEstado IN ('Activo', 'Inactivo'))
 );
 
 -- =================================== Tabla Medico
 CREATE TABLE medico(
 	medicoID 		INT AUTO_INCREMENT,
+    medicoCMP       VARCHAR(6) NOT NULL,
 	medicoNombres 	VARCHAR(50) NOT NULL,
 	medicoApellidos VARCHAR(50) NOT NULL,
 	especialidadID 	INT NOT NULL,
 	medicoEstado 	VARCHAR(10) NOT NULL DEFAULT 'Activo',
     CONSTRAINT pk_medico				PRIMARY KEY (medicoID),
 	CONSTRAINT fk_medico_especialidad 	FOREIGN KEY (especialidadID) REFERENCES especialidad(especialidadID),
+    CONSTRAINT uq_medicoCMP				UNIQUE (medicoCMP),
 	CONSTRAINT ch_medicoNombres 		CHECK (medicoNombres REGEXP '^[a-zA-ZáéíóúÁÉÍÓÚñÑ ]+$' AND LENGTH(TRIM(medicoNombres)) > 0),
 	CONSTRAINT ch_medicoApellidos 		CHECK (medicoApellidos REGEXP '^[a-zA-ZáéíóúÁÉÍÓÚñÑ ]+$' AND LENGTH(TRIM(medicoApellidos)) > 0),
-    CONSTRAINT ch_medicoEstado 			CHECK (medicoEstado IN ('Activo', 'Vacaciones' 'Retirado'))
+    CONSTRAINT ch_medicoEstado 			CHECK (medicoEstado IN ('Activo', 'Vacaciones', 'Retirado'))
 );
 
 -- =================================== Tabla Consultorio
 CREATE TABLE consultorio(
 	consultorioID 		INT AUTO_INCREMENT,
     consultorioCodigo 	CHAR(3) NOT NULL,
+    consultorioEstado	VARCHAR(10) NOT NULL DEFAULT 'Activo',
     CONSTRAINT pk_consultorio 		PRIMARY KEY (consultorioID),
-    CONSTRAINT ch_consultorioCodigo CHECK (consultorioCodigo REGEXP '^[1-4]0[1-7]$')
+    CONSTRAINT ch_consultorioCodigo CHECK (consultorioCodigo REGEXP '^[1-4]0[1-7]$'),
+    CONSTRAINT ch_consultorioEstado CHECK (consultorioEstado IN ('Activo', 'Inactivo'))
 );
 
 -- =================================== Tabla Horario
@@ -83,32 +89,24 @@ CREATE TABLE citas(
     CONSTRAINT ch_citaTipo		CHECK (citaTipo IN ('Nueva', 'Reprogramada'))
 );
 
--- =================================== Tabla Rol
-CREATE TABLE rol(
-	rolID 		INT AUTO_INCREMENT,
-    rolNombre 	VARCHAR(25),
-    CONSTRAINT pk_rol 		PRIMARY KEY (rolID),
-    CONSTRAINT ch_rolNombre CHECK (rolNombre REGEXP '^[a-zA-ZáéíóúÁÉÍÓÚñÑ ]+$' AND LENGTH(TRIM(rolNombre)) > 0)
-);
-
 -- =================================== Tabla Usuario
 CREATE TABLE usuario(
-	usuarioID INT AUTO_INCREMENT,
-    usuarioNombre VARCHAR(50) NOT NULL,
-    usuarioClave VARCHAR (100) NOT NULL,
-    rolID INT NOT NULL,
-    CONSTRAINT pk_usuario PRIMARY KEY (usuarioID),
-    CONSTRAINT fk_usuario_rol FOREIGN KEY (rolID) REFERENCES rol(rolID),
-    CONSTRAINT ch_usuarioNombre CHECK (usuarioNombre REGEXP '^[a-zA-ZáéíóúÁÉÍÓÚñÑ ]+$' AND LENGTH(TRIM(usuarioNombre)) > 0),
-    CONSTRAINT ch_usuarioClave CHECK (LENGTH(TRIM(usuarioClave)) > 0),
-    CONSTRAINT uq_usuario UNIQUE (usuarioNombre)
+	usuarioID 		INT AUTO_INCREMENT,
+	usuarioNombre 	VARCHAR(50) NOT NULL,
+	usuarioClave 	VARCHAR(100) NOT NULL,
+	usuarioRol 		VARCHAR(20) NOT NULL,
+	CONSTRAINT pk_usuario 		PRIMARY KEY (usuarioID),
+	CONSTRAINT ch_usuarioNombre CHECK (usuarioNombre REGEXP '^[a-zA-ZáéíóúÁÉÍÓÚñÑ ]+$' AND LENGTH(TRIM(usuarioNombre)) > 0),
+	CONSTRAINT ch_usuarioClave 	CHECK (LENGTH(TRIM(usuarioClave)) > 0),
+	CONSTRAINT uq_usuario 		UNIQUE (usuarioNombre),
+	CONSTRAINT ch_usuarioRol 	CHECK (usuarioRol IN ('Administrador', 'Recepcionista'))
 );
 
 -- ============================================================================================================================
 -- ======================================================Procesos==============================================================
 -- ============================================================================================================================
 -- =================================== Paciente
--- Create
+-- ================= Create
 DELIMITER //
 CREATE PROCEDURE usp_RegistrarPaciente(
 	IN dni CHAR(8),
@@ -119,11 +117,11 @@ CREATE PROCEDURE usp_RegistrarPaciente(
 )
 BEGIN
 	IF numero = '' THEN
-		SET numero = 'Sin numero';
+		SET numero = 'Sin Numero';
 	END IF;
     
 	IF email = '' THEN
-		SET email = 'Sin email';
+		SET email = 'Sin Email';
 	END IF;
     
     INSERT INTO paciente(pacienteDNI, pacienteNombres, pacienteApellidos, pacienteNumero, pacienteEmail)
@@ -132,7 +130,7 @@ BEGIN
 END //
 DELIMITER ;
 
--- Read
+-- ================= Read
 CREATE VIEW vw_ListaPacientes AS
 SELECT
 	pacienteID as id,
@@ -143,7 +141,7 @@ SELECT
 FROM paciente
 WHERE pacienteEstado = 'Activo';
 
--- Update
+-- ================= Update
 DELIMITER //
 CREATE PROCEDURE usp_ActualizarPaciente(
 	IN id INT,
@@ -155,11 +153,11 @@ CREATE PROCEDURE usp_ActualizarPaciente(
 )
 BEGIN
 	IF numero = '' THEN
-		SET numero = 'Sin numero';
+		SET numero = 'Sin Numero';
 	END IF;
     
 	IF email = '' THEN
-		SET email = 'Sin email';
+		SET email = 'Sin Email';
 	END IF;
     
     UPDATE paciente
@@ -173,7 +171,7 @@ BEGIN
 END //
 DELIMITER ;
 
--- Delete
+-- ================= Delete
 DELIMITER //
 CREATE PROCEDURE usp_EliminarPaciente(
 	IN id INT
@@ -206,10 +204,139 @@ END //
 DELIMITER ;
 
 -- =================================== Especialidad
+-- ================= Create
+DELIMITER //
+CREATE PROCEDURE usp_RegistrarEspecialidad(
+	IN nombre VARCHAR(50)
+)
+BEGIN
+	INSERT INTO especialidad(especialidadNombre)
+    VALUES
+    (nombre);
+END //
+DELIMITER ;
+-- Read
+CREATE VIEW vw_ListaEspecialidades AS
+SELECT 
+	especialidadID AS id,
+    especialidadNombre AS nombre,
+	especialidadEstado AS estado
+FROM especialidad;
+    
+-- ================= Update
+DELIMITER //
+CREATE PROCEDURE usp_ActualizarEspecialidad (
+	IN id INT,
+    IN nombre VARCHAR(50),
+    IN estadoOpcion INT
+)
+BEGIN
+	DECLARE estado VARCHAR(10);
+	DECLARE medicos_activos INT;
+    
+	IF estadoOpcion = 0 THEN 
+		SET estado = 'Activo';    
+    ELSEIF estadoOpcion = 1 THEN
+		SELECT COUNT(*) INTO medicos_activos
+        FROM medico
+        WHERE especialidadID = id AND medicoEstado IN ('Activo', 'Vacaciones');
+        
+        IF medicos_activos > 0 THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: No se puede inactivar la especialidad porque tiene médicos activos o en vacaciones asignados.';
+        END IF;
+        
+		SET estado = 'Inactivo';
+	ELSE 
+		SIGNAL SQLSTATE '45000'
+		SET MESSAGE_TEXT = 'Error: El valor de estadoOpcion no es válido. Solo se permite 0 (Activo) o 1 (Inactivo).';
+	END IF;
+    
+	UPDATE especialidad
+    SET
+		especialidadNombre = nombre,
+        especialidadEstado = estado
+	WHERE especialidadID = id;
+END //
+DELIMITER ;
 
 -- =================================== Medico
+-- ================= Create
+-- ================= Read
+-- ================= Update
 -- =================================== Consultorio
 -- =================================== Horario
 -- =================================== Citas
--- =================================== Roll
 -- =================================== Usuario
+-- ================= Create
+DELIMITER //
+CREATE PROCEDURE usp_RegistrarUsuario(
+	IN nombre VARCHAR(50),
+    IN clave VARCHAR(100),
+    IN rolOption INT
+)
+BEGIN
+	DECLARE rol VARCHAR(20);
+	
+	IF rolOption = 0 THEN
+		SET rol = 'Administrador';
+	ELSEIF rolOption = 1 THEN
+		SET rol = 'Recepcionista';
+	ELSE
+		SIGNAL SQLSTATE '45000'
+		SET MESSAGE_TEXT = 'Error: El valor de rolOption no es válido. Solo se permite 0 (Admin) o 1 (Recepcionista).';
+    END IF;
+    
+    INSERT INTO usuario(usuarioNombre, usuarioClave, usuarioRol)
+    VALUES
+	(nombre, clave, rol);
+END //
+DELIMITER ;
+
+-- ================= Read
+CREATE VIEW vw_ListaUsuarios AS
+SELECT 
+	usuarioID AS id,
+	usuarioNombre AS nombre,
+	usuarioRol AS rol
+FROM usuario;
+
+-- ================= Update
+DELIMITER //
+CREATE PROCEDURE usp_ActualizarUsuario(
+	IN id INT,
+	IN nombre VARCHAR(50),
+    IN clave VARCHAR(100),
+    IN rolOption INT
+)
+BEGIN
+	DECLARE rol VARCHAR(20);
+    
+    IF rolOption = 0 THEN
+		SET rol = 'Administrador';
+    ELSEIF rolOption = 1 THEN
+		SET rol = 'Recepcionista';
+    ELSE
+		SIGNAL SQLSTATE '45000'
+		SET MESSAGE_TEXT = 'Error: El valor de rolOption no es válido. Solo se permite 0 (Admin) o 1 (Recepcionista).';
+    END IF;
+    
+    UPDATE usuario
+    SET
+		usuarioNombre = nombre,
+        usuarioClave = clave,
+        usuarioRol = rol
+	WHERE usuarioID = id;
+END //
+DELIMITER ;
+
+-- ================= Delete
+DELIMITER //
+CREATE PROCEDURE usp_EliminarUsuario(
+	IN id INT
+)
+BEGIN
+	DELETE FROM usuario
+    WHERE usuarioID = id;
+END //
+DELIMITER ;
