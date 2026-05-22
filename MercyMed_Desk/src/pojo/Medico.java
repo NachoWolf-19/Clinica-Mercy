@@ -2,6 +2,7 @@ package pojo;
 
 public class Medico {
 	private final int medicoID;
+	private String medicoCMP;
 	private String medicoNombres;
 	private String medicoApellidos;
 	private String medicoEstado;
@@ -11,20 +12,31 @@ public class Medico {
 		this.medicoID = 0;
 	}
 
-	public Medico(int medicoID, String medicoNombres, String medicoApellidos, String medicoEstado, Especialidad e) {
+	public Medico(int medicoID, String medicoCMP, String medicoNombres, String medicoApellidos, String medicoEstado,
+			Especialidad e) {
 		this.medicoID = medicoID;
+		this.medicoCMP = medicoCMP;
 		this.medicoNombres = medicoNombres;
 		this.medicoApellidos = medicoApellidos;
 		this.medicoEstado = medicoEstado;
 		this.e = e;
 	}
 
-	public Medico(String medicoNombres, String medicoApellidos, String medicoEstado, Especialidad e) {
+	public Medico(String medicoCMP, String medicoNombres, String medicoApellidos, String medicoEstado, Especialidad e) {
 		this.medicoID = 0;
+		this.medicoCMP = medicoCMP;
 		this.medicoNombres = medicoNombres;
 		this.medicoApellidos = medicoApellidos;
 		this.medicoEstado = medicoEstado;
 		this.e = e;
+	}
+
+	public String getMedicoCMP() {
+		return medicoCMP;
+	}
+
+	public void setMedicoCMP(String medicoCMP) {
+		this.medicoCMP = medicoCMP;
 	}
 
 	public String getMedicoNombres() {

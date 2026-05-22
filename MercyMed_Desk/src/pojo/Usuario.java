@@ -4,24 +4,24 @@ public class Usuario {
 	private final int usuarioID;
 	private String usuarioNombre;
 	private String usuarioClave;
-	private Rol r;
+	private String usuarioRol;
 
 	public Usuario() {
 		this.usuarioID = 0;
 	}
 
-	public Usuario(int usuarioID, String usuarioNombre, String usuarioClave, Rol r) {
+	public Usuario(int usuarioID, String usuarioNombre, String usuarioClave, String usuarioRol) {
 		this.usuarioID = usuarioID;
 		this.usuarioNombre = usuarioNombre;
 		this.usuarioClave = usuarioClave;
-		this.r = r;
+		this.usuarioRol = usuarioRol;
 	}
 
-	public Usuario(String usuarioNombre, String usuarioClave, Rol r) {
+	public Usuario(String usuarioNombre, String usuarioClave, String usuarioRol) {
 		this.usuarioID = 0;
 		this.usuarioNombre = usuarioNombre;
 		this.usuarioClave = usuarioClave;
-		this.r = r;
+		this.usuarioRol = usuarioRol;
 	}
 
 	public String getUsuarioNombre() {
@@ -40,12 +40,12 @@ public class Usuario {
 		this.usuarioClave = usuarioClave;
 	}
 
-	public Rol getRol() {
-		return r;
+	public String getUsuarioRol() {
+		return usuarioRol;
 	}
 
-	public void setRol(Rol r) {
-		this.r = r;
+	public void setUsuarioRol(String usuarioRol) {
+		this.usuarioRol = usuarioRol;
 	}
 
 	public int getUsuarioID() {

@@ -7,7 +7,7 @@ USE MercyMedDB;
 -- =================================== Tabla Paciente
 CREATE TABLE paciente(
 	pacienteID 			INT AUTO_INCREMENT,
-	pacienteDNI 		CHAR(8) NULL,
+	pacienteDNI 		CHAR(8),
 	pacienteNombres 	VARCHAR(50) NULL,
 	pacienteApellidos 	VARCHAR(50) NULL,
 	pacienteNumero 		VARCHAR(10) NULL,
@@ -40,7 +40,7 @@ CREATE TABLE medico(
 	medicoNombres 	VARCHAR(50) NOT NULL,
 	medicoApellidos VARCHAR(50) NOT NULL,
 	especialidadID 	INT NOT NULL,
-	medicoEstado 	VARCHAR(10) NOT NULL DEFAULT 'Activo',
+	medicoEstado 	VARCHAR(15) NOT NULL DEFAULT 'Activo',
     CONSTRAINT pk_medico				PRIMARY KEY (medicoID),
 	CONSTRAINT fk_medico_especialidad 	FOREIGN KEY (especialidadID) REFERENCES especialidad(especialidadID),
     CONSTRAINT uq_medicoCMP				UNIQUE (medicoCMP),
@@ -55,7 +55,7 @@ CREATE TABLE consultorio(
     consultorioCodigo 	CHAR(3) NOT NULL,
     consultorioEstado	VARCHAR(10) NOT NULL DEFAULT 'Activo',
     CONSTRAINT pk_consultorio 		PRIMARY KEY (consultorioID),
-    CONSTRAINT ch_consultorioCodigo CHECK (consultorioCodigo REGEXP '^[1-4]0[1-7]$'),
+    CONSTRAINT ch_consultorioCodigo CHECK (consultorioCodigo REGEXP '^[1-9]0[1-9]$'),
     CONSTRAINT ch_consultorioEstado CHECK (consultorioEstado IN ('Activo', 'Inactivo'))
 );
 
@@ -70,8 +70,9 @@ CREATE TABLE horario(
     CONSTRAINT pk_horario 				PRIMARY KEY (horarioID),
     CONSTRAINT fk_horario_medico 		FOREIGN KEY (medicoID) REFERENCES medico(medicoID),
     CONSTRAINT fk_horario_consultorio	FOREIGN KEY (consultorioID) REFERENCES consultorio(consultorioID),
-    CONSTRAINT ch_horario_estado 		CHECK (horarioEstado IN ('Disponible', 'Reservado', 'Cancelado')),
-    CONSTRAINT uq_horario 				UNIQUE (consultorioID, horarioFecha, horarioInicio)
+    CONSTRAINT uq_horario 				UNIQUE (consultorioID, horarioFecha, horarioInicio),
+    CONSTRAINT uq_horario_medico 		UNIQUE (medicoID, horarioFecha, horarioInicio),
+    CONSTRAINT ch_horario_estado 		CHECK (horarioEstado IN ('Disponible', 'Reservado', 'Cancelado'))
 );
 
 -- =================================== Tabla Citas
@@ -116,6 +117,11 @@ CREATE PROCEDURE usp_RegistrarPaciente(
     IN email VARCHAR(150)
 )
 BEGIN
+	IF numero = '' AND email = '' THEN
+		SIGNAL SQLSTATE '45000' 
+		SET MESSAGE_TEXT = 'Error: No se puede registrar al paciente sin datos de contacto. Debe ingresar al menos un teléfono o un correo electrónico.';
+	END IF;	
+	
 	IF numero = '' THEN
 		SET numero = 'Sin Numero';
 	END IF;
@@ -135,9 +141,8 @@ CREATE VIEW vw_ListaPacientes AS
 SELECT
 	pacienteID as id,
     pacienteDNI as dni,
-    CONCAT(pacienteNombres, ' ', pacienteApellidos) AS nombre_completo,
-    pacienteNumero as telefono,
-    pacienteEmail as email
+    pacienteNombres AS nombre,
+    pacienteApellidos AS apellidos
 FROM paciente
 WHERE pacienteEstado = 'Activo';
 
@@ -152,6 +157,11 @@ CREATE PROCEDURE usp_ActualizarPaciente(
     IN email VARCHAR(150)
 )
 BEGIN
+	IF numero = '' AND email = '' THEN
+		SIGNAL SQLSTATE '45000' 
+		SET MESSAGE_TEXT = 'Error: No se puede registrar al paciente sin datos de contacto. Debe ingresar al menos un teléfono o un correo electrónico.';
+	END IF;	
+
 	IF numero = '' THEN
 		SET numero = 'Sin Numero';
 	END IF;
@@ -188,7 +198,7 @@ BEGIN
 
 	IF citas_activas > 0 THEN
 		SIGNAL SQLSTATE '45000' 
-		SET MESSAGE_TEXT = 'No se puede eliminar: El paciente tiene citas reservadas pendientes.';
+		SET MESSAGE_TEXT = 'Error: El paciente tiene citas reservadas pendientes. No se puede eliminar.';
 	ELSE
 		UPDATE paciente
 		SET
@@ -222,6 +232,13 @@ SELECT
     especialidadNombre AS nombre,
 	especialidadEstado AS estado
 FROM especialidad;
+
+CREATE VIEW vw_ListaEspecialidadesActivas AS
+SELECT
+	especialidadID AS id,
+	especialidadNombre AS nombre
+FROM especialidad
+WHERE especialidadEstado = 'Activo';
     
 -- ================= Update
 DELIMITER //
@@ -262,29 +279,164 @@ DELIMITER ;
 
 -- =================================== Medico
 -- ================= Create
+DELIMITER //
+CREATE PROCEDURE usp_RegistrarMedico(
+	IN cmp CHAR(6),
+    IN nombres VARCHAR(50),
+    IN apellidos VARCHAR(50),
+    IN esp INT
+)
+BEGIN
+	INSERT INTO medico(medicoCMP, medicoNombres, medicoApellidos, especialidadID)
+    VALUES
+    (cmp, nombres, apellidos, esp);
+END //
+DELIMITER ;
+
 -- ================= Read
+CREATE VIEW vw_ListaMedicos AS 
+SELECT
+	m.medicoID as id,
+    m.medicoCMP as cmp,
+    m.medicoNombres as nombre,
+    m.medicoApellidos as apellidos,
+    e.especialidadNombre as especialidad,
+    m.medicoEstado as estado
+FROM medico m
+INNER JOIN especialidad e ON m.especialidadID = e.especialidadID;
+
+CREATE VIEW vw_ListaMedicosActivos AS
+SELECT 
+	medicoID as id,
+    medicoCMP as cmp,
+	concat(medicoNombres, ' ', medicoApellidos) as nombre_completo,
+	especialidadID as especialidad_id
+FROM medico
+WHERE medicoEstado = 'Activo';
+
 -- ================= Update
+DELIMITER //
+CREATE PROCEDURE usp_ActualizarMedico(
+	IN id INT,
+    IN cmp CHAR(6),
+    IN nombres VARCHAR(50),
+    IN apellidos VARCHAR(50),
+    IN esp INT,
+    IN estadoOpcion INT
+)
+BEGIN
+	DECLARE estado VARCHAR(15);
+    DECLARE citas_pendientes INT DEFAULT 0;
+    
+	IF estadoOpcion = 0 THEN
+		SET estado = 'Activo';
+	ELSEIF estadoOpcion = 1 THEN
+		SET estado = 'Vacaciones';
+	ELSEIF estadoOpcion = 2 THEN
+		SELECT COUNT(*) INTO citas_pendientes
+        FROM citas c
+        INNER JOIN horario h on c.horarioID = h.horarioID
+        WHERE h.medicoID = id 
+			AND h.horarioEstado = 'Reservado'
+            AND TIMESTAMP(h.horarioFecha, h.horarioInicio) > now();
+		IF citas_pendientes > 0 THEN
+			SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: No se puede cambiar a Retirado. El médico tiene citas reservadas pendientes.';
+		END IF;
+        
+		SET estado = 'Retirado';
+	ELSE
+		SIGNAL SQLSTATE '45000'
+		SET MESSAGE_TEXT = 'Error: El valor de estadoOpcion no es válido. Solo se permite 0 (Activo), 1 (Vacaciones) o 2 (Retirado).';
+	END IF;
+    
+	UPDATE medico
+    SET
+		medicoCMP = cmp,
+        medicoNombres = nombres,
+        medicoApellidos = apellidos,
+        especialidadID = esp,
+        medicoEstado = estado
+	WHERE medicoID = id;
+END //
+DELIMITER ;
+
 -- =================================== Consultorio
+-- ================= Create
+DELIMITER //
+CREATE PROCEDURE usp_RegistrarConsultorio(
+	IN codigo CHAR(3)
+)
+BEGIN
+	INSERT INTO consultorio(consultorioCodigo)
+    VALUES
+    (codigo);
+END //
+DELIMITER ;
+
+-- ================= Read
+CREATE VIEW vw_ListaConsultorios AS
+SELECT
+	consultorioID AS id,
+    consultorioCodigo AS codigo,
+    consultorioEstado AS estado
+FROM consultorio;
+
+CREATE VIEW vw_ListaConsultoriosActivos AS
+SELECT
+	consultorioID AS id,
+    consultorioCodigo AS codigo
+FROM consultorio
+WHERE consultorioEstado = 'Activo';
+
+-- ================= Update
+DELIMITER //
+CREATE PROCEDURE usp_ActualizarConsultorio(
+	IN id INT,
+	IN codigo CHAR(3),
+    IN estadoOpcion INT
+)
+BEGIN
+	DECLARE estado VARCHAR(10);
+	
+	IF estadoOpcion = 0 THEN
+		SET estado = 'Activo';
+	ELSEIF estadoOpcion = 1 THEN
+		SET estado = 'Inactivo';
+	ELSE
+		SIGNAL SQLSTATE '45000'
+		SET MESSAGE_TEXT = 'Error: El valor de estadoOpcion no es válido. Solo se permite 0 (Activo) o 1 (Inactivo).';
+    END IF;
+    
+    UPDATE consultorio
+	SET 
+		consultorioCodigo = codigo,
+        consultorioEstado = estado
+	WHERE consultorioID = id;
+END //
+DELIMITER ;
+
 -- =================================== Horario
 -- =================================== Citas
+
 -- =================================== Usuario
 -- ================= Create
 DELIMITER //
 CREATE PROCEDURE usp_RegistrarUsuario(
 	IN nombre VARCHAR(50),
     IN clave VARCHAR(100),
-    IN rolOption INT
+    IN rolOpcion INT
 )
 BEGIN
 	DECLARE rol VARCHAR(20);
 	
-	IF rolOption = 0 THEN
+	IF rolOpcion = 0 THEN
 		SET rol = 'Administrador';
-	ELSEIF rolOption = 1 THEN
+	ELSEIF rolOpcion = 1 THEN
 		SET rol = 'Recepcionista';
 	ELSE
 		SIGNAL SQLSTATE '45000'
-		SET MESSAGE_TEXT = 'Error: El valor de rolOption no es válido. Solo se permite 0 (Admin) o 1 (Recepcionista).';
+		SET MESSAGE_TEXT = 'Error: El valor de rolOpcion no es válido. Solo se permite 0 (Admin) o 1 (Recepcionista).';
     END IF;
     
     INSERT INTO usuario(usuarioNombre, usuarioClave, usuarioRol)
@@ -301,24 +453,39 @@ SELECT
 	usuarioRol AS rol
 FROM usuario;
 
+DELIMITER //
+CREATE PROCEDURE usp_ValidarUsuario(
+	usuario VARCHAR(50),
+    clave VARCHAR(50)
+)
+BEGIN
+	SELECT
+		usuarioNombre AS usuario,
+        usuarioRol AS rol        
+    FROM usuario
+    WHERE usuarioNombre = usuario
+		AND usuarioClave = clave;
+END //
+DELIMITER ;
+
 -- ================= Update
 DELIMITER //
 CREATE PROCEDURE usp_ActualizarUsuario(
 	IN id INT,
 	IN nombre VARCHAR(50),
     IN clave VARCHAR(100),
-    IN rolOption INT
+    IN rolOpcion INT
 )
 BEGIN
 	DECLARE rol VARCHAR(20);
     
-    IF rolOption = 0 THEN
+    IF rolOpcion = 0 THEN
 		SET rol = 'Administrador';
-    ELSEIF rolOption = 1 THEN
+    ELSEIF rolOpcion = 1 THEN
 		SET rol = 'Recepcionista';
     ELSE
 		SIGNAL SQLSTATE '45000'
-		SET MESSAGE_TEXT = 'Error: El valor de rolOption no es válido. Solo se permite 0 (Admin) o 1 (Recepcionista).';
+		SET MESSAGE_TEXT = 'Error: El valor de rolOpcion no es válido. Solo se permite 0 (Admin) o 1 (Recepcionista).';
     END IF;
     
     UPDATE usuario

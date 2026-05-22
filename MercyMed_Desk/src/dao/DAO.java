@@ -7,37 +7,33 @@ import interfaces.HorarioDAO;
 import interfaces.MedicoDAO;
 import interfaces.PacienteDAO;
 import interfaces.ReporteDAO;
-import interfaces.RolDAO;
 import interfaces.UsuarioDAO;
 
-public abstract class DAO {	
-	//PacienteDAO
+public abstract class DAO {
+	// PacienteDAO
 	public abstract PacienteDAO getPacienteDAO();
-	
-	//EspecialidadDAO
+
+	// EspecialidadDAO
 	public abstract EspecialidadDAO getEspecialidadDAO();
-	
-	//MedicoDAO
+
+	// MedicoDAO
 	public abstract MedicoDAO getMedicoDAO();
-	
-	//HorarioDAO
+
+	// HorarioDAO
 	public abstract HorarioDAO getHorarioDAO();
-	
-	//ConsultorioDAO
+
+	// ConsultorioDAO
 	public abstract ConsultorioDAO getConsultorioDAO();
-	
-	//CitaDAO
+
+	// CitaDAO
 	public abstract CitaDAO getCitaDAO();
-	
-	//ReporteDAO
+
+	// ReporteDAO
 	public abstract ReporteDAO getReporteDAO();
-	
-	//RolDAO
-	public abstract RolDAO getRolDAO();
-	
-	//UsuarioDAO
+
+	// UsuarioDAO
 	public abstract UsuarioDAO getUsuarioDAO();
-	
+
 	public static DAO getDaoFactory() {
 		return new MySqlDAO();
 	}
